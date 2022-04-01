@@ -1,0 +1,946 @@
+---
+title: "ITALIAN WINE PRODUCERS"
+subtitle: |
+  | Applied Statistics
+  | Global Studies. Economy, Society and Law
+author:
+ - Francesco Mutignani
+ - Gabriel Kwesi Yeboah
+ - Huseyn Mammadov 
+ - Luis Carlos Castillo
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output: 
+  slidy_presentation:
+    css: styles.css
+    toc: true
+    toc.depth: 3
+---
+
+```{r setup, echo=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = F, message = F )
+```
+
+```{r loading pacakages, include=FALSE}
+
+library(rmarkdown)
+library(tidytext)
+library(rsdmx)
+library(readxl)
+library(dplyr)
+library(tidyverse)
+library(tidyr)
+library(ggplot2)
+library(lwgeom)
+library(naniar)
+library(visdat)
+library(vtable)
+library(corrplot)
+library(ggcorrplot)
+library(psych)
+library(freqdist)
+library(boot)
+library(qwraps2)
+library(gridExtra)
+library(kableExtra)
+library(gganimate)
+library(maps)
+library(mapproj)
+library(sf)
+library(raster)
+library(tmap)
+library(leaflet)
+library(giscoR)
+library(lwgeom)
+library(gganimate)
+library(gifski)
+library(ggpubr)
+
+```
+
+```{r setting directory, include=FALSE}
+directory <- setwd("~/Dropbox/Tesis/2021/Italy/Urbino/Lectures & Modules/Second Module/Applied Statistics/Presentation")
+wine_df <- read_excel("Italian_wine_producers_01.xlsx", sheet = 2, col_names = TRUE)
+wine_df[, c(1:11, 14:17)] <- lapply(wine_df[,c(1:11, 14:17)], as.factor)
+str(wine_df)
+```
+
+# CONTENT
+
+-   Introduction
+-   Objectives
+-   Database presentation
+-   Database treatment and analysis
+-   Hypothesis testing
+-   Conclusion
+
+# INTRODUCTION
+
+-   In this presentation we have analysed the wine production in Italy, from 2010 to 2013.
+
+-   The data is calculated by using R Studio programming language.
+
+-   We have taken 14 variables out 31 concerning their effectiveness.
+
+-   After the exposition of raw data, we are going to focus on:
+
+    -   Data cleaning
+    -   Data processing
+    -   Data analysis
+
+-   Finally, conclusions will be drawn.
+
+# OBJECTIVES
+
+Illustrate the methodology used in the following points:
+
+1.  Identify the regions that produce more wine
+2.  Evaluate the correlation between inputs and output
+3.  Test a hypothesis
+
+# OBJECTIVE VARIABLE SELECTION
+
+For the aim of this presentation, the use of the whole database would have been excessive; therefore, from 31 variables, 23 numerical and 8 character variables, for our research, we chose the following:
+
+-   4 continuous variables (inputs and output) are obtained by measuring the quantity
+
+-   10 categorical variables:
+
+    -   4 dummy variables (yes or no) about disadvantages (Climate, Soil, Biophysical, Slope).
+    -   6 categorical variables in R are treated as a factor (Years, Firms ID, Province, Province ID, Region, and Region ID).
+
+These are still raw data, without any treatment, and there is already evidence of some outliers. The proof comes from plotting the data of inputs and outputs.
+
+```{r Objective Variable Selection, echo=T}
+wine_df1 <- wine_df[, c(1:6 ,14:17, 22,  25, 26, 28)]
+ str(wine_df1, vec.len= 1)
+```
+
+# NUMBER OF WINE PRODUCERS BY REGION
+
+In the first bar plot we see how the number of producers increase by the years.
+
+```{r Wine producers by year, echo=TRUE, fig.height=7, fig.width=13}
+cbp1 <- c("#8B0000", "#A52A2A", "#B22222",
+          "#DC143C", "#FF0000", "#D55E00", "#CC79A7")
+wine_df1 %>% group_by(Year) %>% summarize(nfirms= n()) %>%  
+ggplot( aes(x= Year, y = nfirms, fill= Year)) + 
+  geom_col() + scale_fill_manual(values= cbp1) +
+  labs(title = "Number of Wine Producers by Year" ,
+       fill = "Years", y ="Number of Producers") +
+  geom_text(aes(label = nfirms), vjust = 0) + 
+  theme(text = element_text(size = 15), legend.position = "bottom",
+        axis.title.x=element_blank())
+```
+
+```{r Wine producers by region, echo=TRUE, fig.height=7, fig.width=13}
+wine_df1 %>%  group_by(Year, COD_AZIENDA2, REGIONE) %>%  
+  summarize(nfirms= n()) %>% 
+ggplot( aes(x= Year, y = nfirms, fill= Year)) +
+  geom_col() + scale_fill_manual(values= cbp1) +
+  facet_wrap(~ REGIONE) + 
+  labs(title = "Number of Wine Producers by Region" ,
+       fill = "Years", y ="Number of Producers") + 
+  theme(text = element_text(size = 15), legend.position = "bottom",
+        axis.title.x=element_blank()) 
+```
+
+This panel shows the bar plot of producers for each region from 2010 to 2013. As we can see, there is a general growth trend in all regions: Piemonte is the top producer, followed by Friuli. Abruzzo has surpassed Veneto that remained almost stable.
+
+# OUTPUT AND INPUT BAR-PLOTS PANEL
+
+```{r Inputs and Output Bar Plots Panel}
+#### output per year in tonnes of wine
+output1 <- wine_df1 %>% group_by(Year, REGIONE) %>% 
+  summarize(output_q= sum(output_q)) %>% 
+ggplot( aes(x= Year, y = output_q, fill= Year)) +
+  geom_col() + scale_fill_manual(values= cbp1)  + 
+  labs(title = "Qty Wine per Year" ,fill = "Years", y ="Tonnes of Wine") +
+  scale_y_continuous(labels = scales::comma) + 
+  theme(text = element_text(size = 15), legend.position = "bottom",
+        axis.title.x=element_blank()) 
+
+#### hours of labor per year
+input1 <- wine_df1 %>% group_by(Year, REGIONE) %>% 
+  summarize(input_labour_q= sum(input_labour_q)) %>% 
+ggplot( aes(x= Year, y = input_labour_q, fill= Year)) +
+  geom_col() + scale_fill_manual(values= cbp1)  + 
+  labs(title = "Hours of Labor per year" ,fill = "Years", y ="Hours") +
+  scale_y_continuous(labels = scales::comma) + 
+  theme(text = element_text(size = 15), legend.position = "bottom",
+        axis.title.x=element_blank()) 
+
+#### machinery use in kW per year
+input2 <- wine_df1 %>% group_by(Year, REGIONE) %>% 
+  summarize(input_cap_machinery_q= sum(input_cap_machinery_q)) %>%
+ggplot( aes(x= Year, y = input_cap_machinery_q, fill= Year)) +
+  geom_col() + scale_fill_manual(values= cbp1)  + 
+  labs(title = "kW per Year" ,fill = "Years", y ="Kilowatts") +
+  scale_y_continuous(labels = scales::comma) + 
+  theme(text = element_text(size = 15), legend.position = "bottom",
+        axis.title.x=element_blank()) 
+
+#### land use per year
+input3 <- wine_df1 %>% group_by(Year, REGIONE) %>% 
+  summarize(input_cap_land_q= sum(input_cap_land_q)) %>% 
+ggplot( aes(x= Year, y = input_cap_land_q, fill= Year)) +
+  geom_col() + scale_fill_manual(values= cbp1)  + 
+  labs(title = "Hectares (ha) per Year" ,fill = "Years", y ="Hectares") +
+  scale_y_continuous(labels = scales::comma) + 
+  theme(text = element_text(size = 15), legend.position = "bottom",
+        axis.title.x=element_blank()) 
+```
+
+-   This panel shows the total values for the continuous variables at the national level.
+
+-   In the first chart, related to the output levels, we can see the presence of one or more high outliers. We think that is due to some typos.
+
+-   Regarding the input variables, we can see that they have a common trend and could be correlated.
+
+```{r Panel of Inputs and Ouputs,  fig.height=7, fig.width=13}
+grid.arrange(output1, input1, input2, input3)
+```
+
+# DATA TREATMENT AND ANALYSIS
+
+## Data treatment with Log-Transformation
+
+-   In the **left graph**, we notice that it is impossible to see anything without any treatment for the data due to very high skewness. Therefore, we proceed with a Logarithmic Transformation, which is one of the most common tool to transform skewed.
+-   In the **right graph** with this treatment, it is now possible to see the histograms and the Kernel Density distribution of the output. We can also notice that it is bell-shaped and skewed on the right side.
+
+```{r Data Treatment and Analysis}
+h1 <- wine_df1  %>% ggplot( aes(output_q)) + 
+  geom_histogram(aes(y= ..density..)) + 
+  facet_wrap(~ Year)  + geom_density(aes(color= "red"), show.legend = FALSE) +
+  labs(title = "Histograms by Years" ,
+       fill = "Soil Disadvantage", x ="Quantity of Wine (log)") + 
+  theme(text = element_text(size = 14)) 
+
+h2 <- wine_df1  %>% ggplot( aes(output_q)) + 
+  geom_histogram(aes(y= ..density..)) + 
+  facet_wrap(~ Year)  + geom_density(aes(color= "red"), show.legend = FALSE) +
+  labs(title = "Histograms by Years" ,
+       fill = "Soil Disadvantage", x ="Quantity of Wine (log)") + 
+  theme(text = element_text(size = 14)) + scale_x_log10()
+```
+
+```{r Panel of histograms raw data, fig.height=7, fig.width=13}
+grid.arrange(h1, h2, nrow= 1)
+```
+
+# OUTLIERS DETECTION AND REMOVAL
+
+```{r Outlier detection}
+b1 <- ggplot(wine_df1, aes(Year ,output_q, fill = Year)) +
+  geom_boxplot() +   scale_fill_manual(values= cbp1) + 
+  labs(title = "Boxplot wine production by year" ,
+       fill = "Year") + theme(text = element_text(size = 15), 
+                              legend.position = "bottom", axis.title.x=element_blank())+ 
+  scale_y_continuous(labels = scales::comma) 
+
+wine_prod_box <- wine_df1[, c(1:6, 14)]
+wine_box <- wine_df1[, c(1:6, 14)]
+wine_box <- na.omit(wine_box)
+wine_box$output_q <- ifelse(wine_box$output_q == 0, 1, wine_box$output_q)
+wine_box[, c(7)] <- lapply(wine_box[,c(7)], log )
+
+b2 <- ggplot(wine_box, aes(Year ,output_q, fill = Year)) +
+  geom_boxplot() +   scale_fill_manual(values= cbp1) + 
+  labs(title = "Boxplot wine production by year with Log" ,
+       fill = "Year") + theme(text = element_text(size = 15), 
+        legend.position = "bottom", axis.title.x=element_blank())+ 
+  scale_y_continuous(labels = scales::comma) 
+
+```
+
+-   In the **left box plot** for outliers detection, we can use informal box plots in both univariate and multivariate data sets. This produces a graphical representation and visually allows a human auditor to pinpoint the outlying points. We detect only one significant outlier in this case, but if we use the log transformation to reduce the data variability, we can see something more.
+
+-   In this case, we have evidence by triangulating data from different sources such as Istituto Nazionale di Statistica and the Italian Wine Central that the presence of three outliers resulted from a typing error, and they can just be removed from the database.
+
+-   In the **right box plot**, with log transformation, the data are more visible, and therefore we can see the presence of more outliers within the sample.
+
+```{r Panel of Boxplots, fig.height=7, fig.width=13}
+grid.arrange(b1, b2, nrow= 1)
+```
+
+# SUMMARY STATISTICS
+
+## Continuous Variables
+
+-   After removing these three outliers, we can now see more "accurate" data for each variable. In the table, the critical aspects of each variable and **robust measures** for skewed data.
+
+-   We also noticed that the mean for most variables is increasing by the year. However, the standard deviation is very high in each of the variables. In this case, we use other measures of central tendency such as the **median** and a robust measure of spread such as the **IQR**.
+
+```{r Summary Statistics, message=FALSE, warning=FALSE}
+
+wine_df_no_out <- wine_df1[-c(2348, 4154, 401),]
+options(qwraps2_markup = "markdown")
+our_summary1 <-
+  list("Total Production" =
+         list("min"       = ~ min(output_q, na.rm = TRUE),
+              "max"       = ~ max(output_q, na.rm = TRUE),
+              "mean" = ~ round(mean(output_q, na.rm = TRUE),2),
+              "sd" = ~ round(sd(output_q, na.rm = TRUE),2),
+              "Pctl.25" = ~ quantile(output_q, probs= 0.25, na.rm = TRUE),
+              "Median" = ~ quantile(output_q, probs= 0.5, na.rm = TRUE),
+              "Pctl.75" = ~ quantile(output_q, probs= 0.75, na.rm = TRUE),
+              "IQR" = ~ IQR(output_q, na.rm = TRUE)),
+       "Hour of Labour" =
+         list("min"       = ~ min(input_labour_q),
+              "max"       = ~ max(input_labour_q),
+              "mean" = ~ round(mean(input_labour_q), 2),
+              "sd" = ~ round(sd(input_labour_q),2),
+              "Pctl.25" = ~ quantile(input_labour_q, probs= 0.25, na.rm = TRUE),
+              "Median" = ~ quantile(input_labour_q, probs= 0.5, na.rm = TRUE),
+              "Pctl.75" = ~ quantile(input_labour_q, probs= 0.75, na.rm = TRUE),
+              "IQR" = ~ IQR(input_labour_q, na.rm = TRUE)),
+       "Land in Hectares" =
+         list("min"       = ~ min(input_cap_land_q, na.rm = TRUE),
+              "max"       = ~ max(input_cap_land_q, na.rm = TRUE),
+              "mean" = ~ round(mean(input_cap_land_q, na.rm = TRUE), 2),
+              "sd" = ~ round(sd(input_cap_land_q, na.rm = TRUE), 2),
+              "Pctl.25" = ~ quantile(input_cap_land_q, probs= 0.25, na.rm = TRUE),
+              "Median" = ~ quantile(input_cap_land_q, probs= 0.5, na.rm = TRUE),
+              "Pctl.75" = ~ quantile(input_cap_land_q, probs= 0.75, na.rm = TRUE),
+              "IQR" = ~ IQR(input_cap_land_q, na.rm = TRUE)),
+       "Machinery in Kilowatts" =
+         list("min"       = ~ min(input_cap_machinery_q, na.rm = TRUE),
+              "max"       = ~ max(input_cap_machinery_q, na.rm = TRUE),
+              "mean" = ~ round(mean(input_cap_machinery_q, na.rm = TRUE), 2),
+              "sd" = ~ round(sd(input_cap_machinery_q, na.rm = TRUE), 2),
+              "Pctl.25" = ~ quantile(input_cap_machinery_q, probs= 0.25, na.rm = TRUE),
+              "Median" = ~ quantile(input_cap_machinery_q, probs= 0.5, na.rm = TRUE),
+              "Pctl.75" = ~ quantile(input_cap_machinery_q, probs= 0.75, na.rm = TRUE),
+              "IQR" = ~ IQR(input_cap_machinery_q, na.rm = TRUE))
+  )
+stats_by_year <- summary_table(dplyr::group_by(wine_df_no_out, Year), our_summary1)
+kbl(stats_by_year) %>%
+  kable_styling(bootstrap_options = c( "condensed", "responsive")) %>% 
+  kable_paper( full_width = T) %>%
+  pack_rows("Tonnes of Wine", 1, 8) %>%
+  pack_rows("Hour of Labour", 9, 16) %>% 
+  pack_rows("Land in Hectares", 17, 24) %>%
+  pack_rows("Machinery in Kilowatts", 25, 32)
+              
+
+
+```
+
+## Categorical Variables
+
+```{r Summary Statistics Categorical, message=FALSE, warning=FALSE}
+summ_stats <- na.omit(wine_df_no_out)
+our_summary2 <- 
+  list("Prop - Soil Disadvantage" =list("Yes" = ~ n_perc(SV_SUOLO == 1),
+                                        "No"  = ~ n_perc(SV_SUOLO == 0)),
+       "Prop - Climate Disadvantage" = list("Yes"= ~ n_perc(SV_CLIMA == 1),
+                                            "No"= ~ n_perc(SV_CLIMA == 0)),
+       "Prop - Slope Disadvantage" = list("Yes" = ~ n_perc(SV_PENDENZA == 1),
+                                          "No"  = ~ n_perc(SV_PENDENZA == 0)),
+       "Prop - Biophysical Disadvantage" = list("Yes" = ~ n_perc(SV_BIOFISICO == 1),
+                                                "No"= ~ n_perc(SV_BIOFISICO == 0))
+       )
+
+
+
+stats_by_year_dis <- summary_table(dplyr::group_by(summ_stats, Year), our_summary2)
+kbl(stats_by_year_dis) %>%
+  kable_styling(bootstrap_options = c( "condensed", "responsive")) %>% 
+  kable_paper( full_width = T) %>%
+  pack_rows("Prop - Soil Disadvantage", 1, 2) %>%
+  pack_rows("Prop - Climate Disadvantage", 3, 4) %>% 
+  pack_rows("Prop - Slope Disadvantage", 5, 6) %>%
+  pack_rows("Prop - Biophysical Disadvantage", 7, 8)
+```
+
+# PRODUCTION BY REGION AND PROVINCE
+
+```{r Maps of Italy by province, warning=FALSE, message=FALSE}
+
+nuts <- gisco_nuts
+italy <- subset(nuts, CNTR_CODE == "IT" & LEVL_CODE == 2)
+italy_nuts3 <- subset(nuts, CNTR_CODE == "IT" & LEVL_CODE == 3)
+wine_df_no_out <- wine_df1[-c(2348, 4154, 401),]
+
+it_prod_prov1 <- wine_df_no_out %>% group_by(Year ,NUTS_ID) %>% 
+  summarise(output_q_sum = sum(output_q))
+
+### grouping by 2010 and province ID ####
+cbp2 <- c("#FFA07A", "#F08080", "#FF6347",
+          "#FF0000", "#DC143C", "#A52A2A", "#8B0000")
+
+
+it_prod_prov <- wine_df_no_out
+it_prod_prov1 <- it_prod_prov %>% group_by(Year ,NUTS_ID) %>% 
+  summarise(output_q_sum = sum(output_q))
+it_prod_prov2010 <- it_prod_prov1 %>% filter(Year == "2010")
+
+### ploting map 2010 and province  ###
+prov_q_2010 <- left_join(italy_nuts3, it_prod_prov2010, by= "NUTS_ID")
+map_2010 <- tm_shape(prov_q_2010) + 
+  tm_fill("output_q_sum", 
+          title = "Wine Output 2010", 
+          style = "fixed",
+          breaks= c(0 ,10000, 50000, 100000, 500000, 1000000, 3000000, Inf),
+          n=8, palette=cbp2,
+          colorNA = "#D3D3D3",
+          textNA = "No data available") +
+  tm_polygons( id= "NUTS_ID") +
+  tm_layout(legend.position = c("left","bottom"))
+
+### grouping by 2011 and province ID ####
+it_prod_prov1 <- it_prod_prov %>% group_by(Year ,NUTS_ID) %>% 
+  summarise(output_q_sum = sum(output_q))
+it_prod_prov2011 <- it_prod_prov1 %>% filter(Year == "2011")
+
+### ploting map 2010 and province  ###
+prov_q_2011 <- left_join(italy_nuts3, it_prod_prov2011, by= "NUTS_ID")
+map_2011 <-tm_shape(prov_q_2011) + 
+  tm_fill("output_q_sum", 
+          title = "Wine Output 2011", 
+          style = "fixed",
+          breaks= c(0 ,10000, 50000, 100000, 500000, 1000000, 3000000, Inf),
+          n=8, palette=cbp2,
+          colorNA = "#D3D3D3",
+          textNA = "No data available") +
+  tm_polygons( id= "NUTS_ID") +
+  tm_layout(legend.position = c("left","bottom"))
+
+
+### grouping by 2012 and province ID ####
+it_prod_prov1 <- it_prod_prov %>% group_by(Year ,NUTS_ID) %>% 
+  summarise(output_q_sum = sum(output_q))
+it_prod_prov2012 <- it_prod_prov1 %>% filter(Year == "2012")
+
+### ploting map 2012 and province  ###
+prov_q_2012 <- left_join(italy_nuts3, it_prod_prov2012, by= "NUTS_ID")
+map_2012 <-tm_shape(prov_q_2012) + 
+  tm_fill("output_q_sum", 
+          title = "Wine Output 2012", 
+          style = "fixed",
+          breaks= c(0 ,10000, 50000, 100000, 500000, 1000000, 3000000, Inf),
+          n=8, palette=cbp2,
+          colorNA = "#D3D3D3",
+          textNA = "No data available") +
+  tm_polygons( id= "NUTS_ID") +
+  tm_layout(legend.position = c("left","bottom"))
+
+### grouping by 2013 and province ID ####
+it_prod_prov1 <- it_prod_prov %>% group_by(Year ,NUTS_ID) %>% 
+  summarise(output_q_sum = sum(output_q))
+it_prod_prov2013 <- it_prod_prov1 %>% filter(Year == "2013")
+
+### ploting map 2013 and province  ###
+prov_q_2013 <- left_join(italy_nuts3, it_prod_prov2013, by= "NUTS_ID")
+map_2013 <-tm_shape(prov_q_2013) + 
+  tm_fill("output_q_sum", 
+          title = "Wine Output 2013", 
+          style = "fixed",
+          breaks= c(0 ,10000, 50000, 100000, 500000, 1000000, 3000000, Inf),
+          n=8, palette=cbp2,
+          colorNA = "#D3D3D3",
+          textNA = "No data available") +
+  tm_polygons( id= "NUTS_ID") +
+  tm_layout(legend.position = c("left","bottom"))
+
+maps <- tmap_arrange(map_2010, map_2011, map_2012, map_2013)
+
+
+
+
+```
+
+-   Now that the critical outliers have been deleted, we can see the actual variation of output quantity over the years.
+-   In this case, we decided to use the Region ID (NUTS_ID) and Province ID (FID) to develop these map sequences.
+-   Even if Piemonte has more producers, Veneto always has a high output level.
+-   Notice also the Sardegna trend to high levels of output. At the province level, some data were missing, but the general trend is positive.
+
+```{r echo=FALSE, out.width="50%", fig.show = 'hold'}
+knitr::include_graphics(c( "/Users/lcastillot/Dropbox/Tesis/2021/Italy/Urbino/Lectures & Modules/Second Module/Applied Statistics/Presentation/Charts/reg.GIF", "/Users/lcastillot/Dropbox/Tesis/2021/Italy/Urbino/Lectures & Modules/Second Module/Applied Statistics/Presentation/Charts/prov.GIF"))
+```
+
+## Pareto's Principle
+
+```{r echo=FALSE, out.width="50%", fig.show = 'hold'}
+knitr::include_graphics(c( "/Users/lcastillot/Dropbox/Tesis/2021/Italy/Urbino/Lectures & Modules/Second Module/Applied Statistics/Presentation/Charts/reg.GIF", "/Users/lcastillot/Dropbox/Tesis/2021/Italy/Urbino/Lectures & Modules/Second Module/Applied Statistics/Presentation/Charts/pareto.png"))
+```
+
+```{r}
+
+```
+
+# CATEGORICAL VARIABLES BAR-PLOTS
+
+Here we are considering the 4 categorical variables that are related to 4 specific disadvantages faced by producers:
+
+-   **Biophysical**: as we can see, there is a positive trend of firms that face the problem, while those who don't are stable.
+
+-   **Climate**: here, we have the opposite situation; in fact, many firms confirm that they are not affected by this disadvantage, but the trend of the affected producers has a higher share than the previous case.
+
+-   **Slope**: in this chart, we can see that the sector is expanding in plain territories and very few new firms on high slope grounds.
+
+-   **Soil**: in this case, firms with this kind of disadvantage share the same trend as those that don't.
+
+```{r Categorical Variables Bar-Plots, fig.height=7, fig.width=13}
+
+disad_soil_no <- wine_df1 %>%  group_by(Year)  %>%  
+  summarize(no_firms = sum(SV_SUOLO == 0, na.rm = T)) %>% 
+  mutate(disadvantage = "Soil", affected = "no")
+disad_soil_yes <- wine_df1 %>%  group_by(Year)  %>%  
+  summarize(no_firms = sum(SV_SUOLO == 1, na.rm = T)) %>% 
+  mutate(disadvantage = "Soil", affected = "yes")
+
+disad_clima_no <- wine_df1 %>%  group_by(Year)  %>%  
+  summarize(no_firms = sum(SV_CLIMA == 0, na.rm = T)) %>% 
+  mutate(disadvantage = "Climate", affected = "no")
+disad_clima_yes <- wine_df1 %>%  group_by(Year)  %>%  
+  summarize(no_firms = sum(SV_CLIMA == 1, na.rm = T)) %>% 
+  mutate(disadvantage = "Climate", affected = "yes")
+
+disad_bio_no <- wine_df1 %>%  group_by(Year)  %>%  
+  summarize(no_firms = sum(SV_BIOFISICO == 0, na.rm = T)) %>% 
+  mutate(disadvantage = "Biophysical", affected = "no")
+disad_bio_yes <- wine_df1 %>%  group_by(Year)  %>%  
+  summarize(no_firms = sum(SV_BIOFISICO == 1, na.rm = T)) %>% 
+  mutate(disadvantage = "Biophysical", affected = "yes")
+
+disad_slope_no <- wine_df1 %>%  group_by(Year)  %>%  
+  summarize(no_firms = sum(SV_PENDENZA == 0, na.rm = T)) %>% 
+  mutate(disadvantage = "Slope", affected = "no")
+disad_slope_yes <- wine_df1 %>%  group_by(Year)  %>%  
+  summarize(no_firms = sum(SV_PENDENZA == 1, na.rm = T)) %>% 
+  mutate(disadvantage = "Slope", affected = "yes")
+
+disad_tot <- rbind(disad_soil_no, disad_soil_yes, disad_clima_no,
+                   disad_clima_yes, disad_bio_no, disad_bio_yes,
+                   disad_slope_no, disad_slope_yes)
+
+ggplot(disad_tot, aes( x= Year , y = no_firms)) +
+  geom_col(aes(fill= affected), position = "dodge") + facet_wrap(~ disadvantage) +
+  labs(title = "Companies that Faced Disadvantages" ,
+       fill = "Affected", x ="Years", y = "Number of Firms") + 
+  scale_fill_manual(values= cbp1) + 
+  theme(text = element_text(size = 15))
+```
+
+# CORRELATION WITHIN CONTINOUS VARIABLES
+
+This panel shows how the chosen continuous variables with a log transformation correlate in the year 2013.
+
+-   First of all, under the log transformation, we can see they are almost normal distributed, with very little skewness.
+
+-   Second, it's interesting to notice that inputs variables are more correlated with each other than with the output variable.
+
+An answer could be that the output level is influenced by many variables and goes beyond the single correlation with an input. Correlation does not mean causation. Even though causality analysis is out of the scope of this study, it would be valuable for future reserach.
+
+```{r Correlation within continuos variables, fig.height=7, fig.width=13}
+wine_cor <- wine_df_no_out[, c(1,7:14)]
+cor_2013 <- wine_cor %>% filter(Year == 2013)
+cor_2013 <- na.omit(cor_2013)
+cor_2013$output_q <- ifelse(cor_2013$output_q == 0, 1, cor_2013$output_q)
+cor_2013[, c(6 : 9)] <- lapply(cor_2013[,c(6 : 9)], log )
+
+pairs.panels(cor_2013[, -c(1:5)], 
+             method = "pearson", # correlation method
+             hist.col = "#A52A2A",
+             density = TRUE,  # show density plots
+             lm = TRUE ,
+             show.points = TRUE,
+             main="Histograms and Correlation of Continuous Variables",
+             cex.labels  = 2)
+             # show correlation ellipses
+
+```
+
+# BOX-PLOT ANALYSIS
+
+## Center, Variability and Quartiles.
+
+```{r Box-plot Analysis,fig.height=7, fig.width=13}
+
+wine_prod_box <- wine_df_no_out[, c(1:6,11: 14)]
+wine_prod_box <- na.omit(wine_prod_box)
+wine_prod_box$output_q <- ifelse(wine_prod_box$output_q == 0, 1, 
+                                 wine_prod_box$output_q)
+wine_prod_box[, c(7:10)] <- lapply(wine_prod_box[,c(7:10)], log )
+
+b3 <- ggplot(wine_prod_box, aes(x= Year, y= output_q,  fill= Year)) +
+  geom_boxplot() + scale_fill_manual(values= cbp1) +
+  labs(title = "Boxplot wine production by year (Log)" ,
+       fill = "Year", y= "Total Production in Tonnes (Log)") + 
+  theme(text = element_text(size = 15), 
+        legend.position = "bottom", axis.title.x=element_blank())
+
+#### box plot inputs labour 
+wine_df_no_out <- wine_df1[-c(2348, 4154, 401),]
+b4 <- ggplot(wine_prod_box, aes(Year ,input_labour_q, fill = Year)) +
+  geom_boxplot() + 
+  scale_fill_manual(values= cbp1) + 
+  labs(title = "Boxplot input labour by year (Log)" ,
+       fill = "Year", y = "Hours of Labour (log)") + theme(text = element_text(size = 15), 
+                              legend.position = "bottom", 
+                              axis.title.x=element_blank())+ 
+  scale_y_continuous(labels = scales::comma) 
+
+#### box plot inputs machinery 
+b5 <- ggplot(wine_prod_box, aes(Year ,input_cap_machinery_q, fill = Year)) +
+  geom_boxplot() + 
+  scale_fill_manual(values= cbp1) + 
+  labs(title = "Boxplot input machinery by year (Log)" ,
+       fill = "Year", y= "Machinery in Kilowatts (Log)") + theme(text = element_text(size = 15), 
+                              legend.position = "bottom", 
+                              axis.title.x=element_blank())+ 
+  scale_y_continuous(labels = scales::comma) 
+
+#### box plot inputs land 
+b6 <- ggplot(wine_prod_box, aes(Year ,input_cap_land_q, fill = Year)) +
+  geom_boxplot() + 
+  scale_fill_manual(values= cbp1) + 
+  labs(title = "Boxplot input land by year  (Log)" ,
+       fill = "Year", y= "Land in Hectares (Log)" ) + theme(text = element_text(size = 15), 
+                              legend.position = "bottom", 
+                              axis.title.x=element_blank())+ 
+  scale_y_continuous(labels = scales::comma) 
+
+
+
+```
+
+This box-plot panel can identify robust measures for skewed data such as the median, IQR, and quartiles.
+
+-   We used the log transformation again to better view the data.
+
+-   As you can see, the center is almost the same every year considered for the first quartile.
+
+-   We can notice some differences for the third quartile, especially for the production of wine.
+
+-   We can notice some differences between minimum and maximum values.
+
+We did not remove all the outliers. Otherwise, we will lose valuable information from the data.
+
+```{r Box-plot panel input-output, fig.height=7, fig.width=13}
+grid.arrange(b3, b4, b5, b6)
+```
+
+# HYPOTHESIS TESTING
+
+For the hypothesis testing, we selected the year 2013, which has 1197 observations. We assumed that this sample is a good representation of the population.
+
+### Hypothesis formulation
+
+***Ho:*** the mean of the production of the companies that did not face soil disadvantages (***Soil_0***) is ***equal*** to the mean of the companies that face soil disadvantages (***Soil_1***).
+
+***H1:*** there are differences between the two groups.
+
+### Mathematical representation
+
+***Ho:*** *Soil_0 = Soil_1* ---> ***Ho:*** *Soil_0 - Soil_1 = 0*
+
+***H1:*** *Soil_0 ≠ Soil_1* ---> ***H1:*** *Soil_0 - Soil_1 ≠ 0*
+
+1.  We wanted to test the hypothesis with:
+
+    • Welch Two- Sample t-test with log transformed data
+
+    • Bootstrap distribution with 1000 replications
+
+# BOX-PLOT VS HISTOGRAM
+
+## Two Groups of Producers Facing Soil Disadvantage in 2013
+
+```{r Plotting the box-pot and histograms, echo=FALSE, warning=F, message=FALSE}
+wine_2013 <- wine_df_no_out %>% filter(Year == 2013)
+wine_2013 <- na.omit(wine_2013)
+box_samp <- ggplot(cor_2013, aes(x= SV_SUOLO, y= output_q, fill= SV_SUOLO)) + geom_boxplot() + 
+  labs(title = "Production of wine by soil disadvantage in 2013" ,
+       y = "Quantity of wine in Tonnes (Log)", fill ="Soil Disadvantage") + 
+  scale_fill_manual(values= cbp1) + 
+  theme(text = element_text(size = 12), 
+        legend.position = "bottom", 
+        axis.title.x=element_blank())
+
+hist1_samp <- cor_2013 %>% group_by(SV_SUOLO) %>% filter(SV_SUOLO == 1) %>%  
+  ggplot(aes(output_q))+  geom_histogram(bins = 50)+
+  labs(title = "Histogram of soil disadvantage = 1 in 2013" ,
+      x = "Quantity of wine in Tonnes (Log)") + 
+  scale_fill_manual(values= cbp1) + 
+  theme(text = element_text(size = 12))# histogram of the sample 
+
+hist0_samp <- cor_2013 %>% group_by(SV_SUOLO) %>% filter(SV_SUOLO == 0) %>% 
+  ggplot( aes(output_q))+  geom_histogram()+
+  labs(title = "Histogram of soil disadvantage = 0 in 2013" ,
+       x = "Quantity of wine in Tonnes (Log)") + 
+  scale_fill_manual(values= cbp1) + 
+  theme(text = element_text(size = 12)) # histogram of the sample 
+
+```
+
+```{r Binding the plots, echo=TRUE, fig.height=7, fig.width=13}
+grid.arrange(box_samp, hist0_samp, hist1_samp,
+    layout_matrix = rbind(c(1, 2), c(1, 3)))
+```
+
+# WELCH TWO SAMPLE T-TEST
+
+## Results of the t-test with log transformed data
+
+The results of this t-test provide evidence to accept the null hypothesis as we see the p-value is greater than the usual levels of significance (1%, 5%, and 10%). In this case, we can say that in this sample, both groups of producers have the same average production in the year 2013.
+
+We also compared these results with other tests:
+
+-   Two-sample Kolmogorov-Smirnov test.
+
+-   Kruskal-Wallis rank sum test (non-parametric)
+
+-   Wilcoxon rank-sum test with continuity correction (non-parametric)
+
+We obtained the same results, the null hypothesis is accepted.
+
+```{r Preparing data for the t-test, echo=F, warning=FALSE, message=FALSE, include=FALSE}
+
+wine_cor <- wine_df_no_out[, c(1,7:14)]
+cor_2013 <- wine_cor %>% filter(Year == 2013)
+cor_2013 <- na.omit(cor_2013)
+cor_2013$output_q <- ifelse(cor_2013$output_q == 0, 1, cor_2013$output_q)
+cor_2013[, c(6 : 9)] <- lapply(cor_2013[,c(6 : 9)], log )
+
+
+wine_box <- na.omit(cor_2013)
+suolo_0 <- mean(wine_box$output_q[wine_box$SV_SUOLO == "0"])
+suolo_1 <- mean(wine_box$output_q[wine_box$SV_SUOLO == "1"])
+with(wine_box, tapply(output_q, SV_SUOLO, mean))
+
+
+```
+
+```{r Running the test, echo=TRUE, warning=FALSE, message=FALSE}
+t.test(wine_box$output_q~ wine_box$SV_SUOLO, 
+       alternative = "two.sided", mu= 0, paired = F)
+```
+
+# Bootstrap distribution
+
+What is bootstrapping?
+
+![](https://lh3.googleusercontent.com/gPaKgJUkmkiXYjUrixY2vWxclu1ERDg_uLfDd3Dl4r4dFJRnvuLMIn6LeGbuLVug_SqhdI6kxVh6Hyf7l3TNnTn6btmtphSO2TcXuPwTm4Cq5TzNRwN8eYNZjUN4q3dsDg)\
+
+-   we replicate resampling with replacement with the same size of the sample a 1.000 times.
+
+# WHY BOOTSTRAPPING?
+
+Without log transformation, our data does not have a normal distribution. In this case, the distribution of the population of the wine producers is unknown, but with bootstrapping, this unknown population can be a model (Henderson, 2005).
+
+```{r Plots of the samp with no log, warning=FALSE, message=FALSE, include=FALSE,echo=FALSE}
+
+wine_2013_focus <- wine_2013[, c(2, 5, 7:10, 14)]
+
+soil_0 <- wine_2013_focus %>% filter(SV_SUOLO == 0)
+soil_1 <- wine_2013_focus %>% filter(SV_SUOLO == 1)
+
+soil_0 <- soil_0 %>% rowid_to_column()
+soil_1 <- soil_1 %>% rowid_to_column()
+
+set.seed(53658658)# setting seed for replicability 
+### sample wine data-frame 2013 with same obs size with replacement
+soil_0_samp <- soil_0 %>% slice_sample(prop= 1, replace = TRUE)
+soil_1_samp <- soil_1 %>% slice_sample(prop= 1, replace = TRUE)
+
+soil_0_samp %>%  count(rowid, sort = TRUE) 
+soil_1_samp %>% count(rowid, sort = TRUE)
+### number of firms included and non included in the sample
+soil_0_samp %>%  summarize(firms_included = n_distinct(rowid), 
+                                firms_not_included = n()- firms_included)
+soil_1_samp %>%  summarize(firms_included = n_distinct(rowid), 
+                           firms_not_included = n()- firms_included)
+
+box1 <- ggplot(soil_0_samp, aes(output_q))+  geom_histogram()+
+  labs(title = "Sample Distribution - Soil Disadvantage = 0" ,
+       fill = "Soil Disadvantage", x ="Soil Disadvantage") + 
+  scale_fill_manual(values= cbp1) + 
+  theme(text = element_text(size = 17))# histogram of the sample 
+
+box2 <- ggplot(soil_1_samp, aes(output_q))+  geom_histogram()+
+  labs(title = "Sample Distribution - Soil Disadvantage = 1" ,
+       fill = "Soil Disadvantage", x ="Soil Disadvantage") + 
+  scale_fill_manual(values= cbp1) + 
+  theme(text = element_text(size = 17)) # histogram of the sample 
+mean_soil_0_samp_1000 <- replicate(
+  n= 1000,
+  expr = {
+    soil_0_samp %>% 
+      slice_sample(prop = 1, replace = TRUE) %>% 
+      summarize(mean_ouput_q = mean(output_q)) %>% 
+      pull(mean_ouput_q)
+  }
+)
+
+mean_soil_1_samp_1000 <- replicate(
+  n= 1000,
+  expr = {
+    soil_1_samp %>% 
+      slice_sample(prop = 1, replace = TRUE) %>% 
+      summarize(mean_ouput_q = mean(output_q)) %>% 
+      pull(mean_ouput_q)
+  }
+)
+
+boot_soil_0 <- tibble(resample_mean_0 = mean_soil_0_samp_1000)
+boot_soil_1 <- tibble(resample_mean_1 = mean_soil_1_samp_1000)
+
+```
+
+```{r Binding the plots of the sample, fig.height=7, fig.width=13, echo=TRUE, message=FALSE,warning=FALSE}
+grid.arrange(box1, box2, nrow= 1)
+
+```
+
+# COMPARING STATISTICS
+
+```{r Comparing the means, warning=FALSE, include=FALSE, message=FALSE}
+
+### t-test for 2 independent sample
+sv_soil_0 <-  cor_2013 %>% group_by(SV_SUOLO) %>% filter(SV_SUOLO == 0)  %>% 
+  summarize(mean = mean(output_q), sd= sd(output_q), 
+            CI_lower = quantile(output_q, 0.025, na.rm = TRUE),
+            CI_upper = quantile(output_q, 0.975, na.rm = TRUE))
+
+
+sv_soil_1 <-  cor_2013 %>% group_by(SV_SUOLO) %>% filter(SV_SUOLO == 1)  %>% 
+  summarize(mean = mean(output_q), sd= sd(output_q), 
+            CI_lower = quantile(output_q, 0.025, na.rm = TRUE),
+            CI_upper = quantile(output_q, 0.975, na.rm = TRUE))
+
+sv_soil_samp_0 <-  soil_0_samp %>% group_by(SV_SUOLO) %>% 
+  filter(SV_SUOLO == 0)  %>% 
+  summarize(mean = mean(output_q), sd= sd(output_q), 
+            CI_lower = quantile(output_q, 0.025, na.rm = TRUE),
+            CI_upper = quantile(output_q, 0.975, na.rm = TRUE))
+
+sv_soil_samp_1 <-  soil_1_samp %>% group_by(SV_SUOLO) %>% 
+  filter(SV_SUOLO == 1)  %>% 
+  summarize(mean = mean(output_q), sd= sd(output_q), 
+            CI_lower = quantile(output_q, 0.025, na.rm = TRUE),
+            CI_upper = quantile(output_q, 0.975, na.rm = TRUE))
+
+
+boot_soil_samp_0 <-  boot_soil_0  %>%
+  summarize(mean = mean(resample_mean_0), sd= sd(resample_mean_0), 
+            CI_lower = quantile(resample_mean_0, 0.025, na.rm = TRUE),
+            CI_upper = quantile(resample_mean_0, 0.975, na.rm = TRUE))
+boot_soil_samp_0 <- boot_soil_samp_0 %>% mutate(SV_SUOLO = 0)
+boot_soil_samp_0 <- boot_soil_samp_0[, c(5, 1:4)]
+
+
+boot_soil_samp_1 <-  boot_soil_1   %>% 
+  summarize(mean = mean(resample_mean_1), sd= sd(resample_mean_1), 
+            CI_lower = quantile(resample_mean_1, 0.025, na.rm = TRUE),
+            CI_upper = quantile(resample_mean_1, 0.975, na.rm = TRUE))
+boot_soil_samp_1 <- boot_soil_samp_1 %>% mutate(SV_SUOLO = 1)
+boot_soil_samp_1 <- boot_soil_samp_1[, c(5, 1:4)]
+
+
+stats_comp <- rbind(sv_soil_0,sv_soil_1, sv_soil_samp_0, sv_soil_samp_1,
+                   boot_soil_samp_0, boot_soil_samp_1)
+
+stats_comp <- stats_comp %>% mutate_if(is.numeric, round, digits= 3)
+
+
+```
+
+```{r Making a table of stats, echo=TRUE}
+
+kable(stats_comp, caption = "Summary Statistic") %>%
+  kable_styling(bootstrap_options = c( "condensed", "responsive")) %>% 
+  kable_paper( full_width = T) %>%
+  pack_rows("Sample with log", 1, 2) %>%
+  pack_rows("Resample without log", 3, 4) %>% 
+  pack_rows("Bootstrap with 1000 replications", 5, 6) 
+```
+
+# BOOTSTRAP DISTRIBUTION PLOTS
+
+## Histograms and Normality Test
+
+```{r Histograms and Normality test, echo=FALSE, include=FALSE}
+
+boothist0 <- ggplot(boot_soil_0, aes(resample_mean_0))+  
+  geom_histogram(bins = 30) +
+  labs(title = "Bootstrap Distribution - Soil Disadvantage = 0" ,
+       fill = "Soil Disadvantage", x ="Soil Disadvantage") + 
+  scale_fill_manual(values= cbp1) + 
+  theme(text = element_text(size = 15))
+qqplot0 <- ggqqplot(boot_soil_0$resample_mean_0, 
+                    title = "QQplot of BD Soil Disadvantage = 0 ")
+
+boothist1 <- ggplot(boot_soil_1, aes(resample_mean_1))+  
+  geom_histogram(bins = 30)+
+  labs(title = "Bootstrap Distribution - Soil Disadvantage = 1" ,
+       fill = "Soil Disadvantage", x ="Soil Disadvantage") + 
+  scale_fill_manual(values= cbp1) + 
+  theme(text = element_text(size = 15))
+qqplot1 <- ggqqplot(boot_soil_1$resample_mean_1, 
+                    title = "QQplot of BD Soil Disadvantage = 1 ")
+```
+
+```{r Binding the Histograms and QQplots, echo=TRUE, fig.height=7, fig.width=13}
+grid.arrange(boothist0, qqplot0, boothist1, qqplot1)
+
+```
+
+# TESTING THE HYPOTHESIS WITH THE BOOTSTRAP DISTRIBUTION
+
+### Hypothesis formulation
+
+***Ho:*** the mean of the production of the companies that did not face soil disadvantages (***Soil_0***) is ***equal*** to the mean of the companies that face soil disadvantages (***Soil_1***).
+
+***H1:*** there are differences between the two groups.
+
+### Mathematical representation
+
+***Ho:*** *Soil_0 = Soil_1* ---> ***Ho:*** *Soil_0 - Soil_1 = 0*
+
+***H1:*** *Soil_0 ≠ Soil_1* ---> ***H1:*** *Soil_0 - Soil_1 ≠ 0*
+
+After replicating the re-sampling 1000 times, we see that both groups' bootstrap distribution is normally distributed. And making the exact t-test with the bootstrap distribution as we see in the results, the p-value is smaller than the different levels of significance (10%, 5%, and 1%). With this test, now we have more accurate evidence that the average production of wine between the group of producers that face and do not face soil disadvantages is different.
+
+```{r Testing the Hypothesis with BD, echo=TRUE}
+
+t_test <- t.test(boot_soil_0$resample_mean_0, boot_soil_1$resample_mean_1, 
+                 alternative = "two.sided", mu= 0, paired = F)
+t_test
+```
+
+# CONCLUSIONS
+
+-   The presence of high values considered outliers significantly affected the data and prevented a precise reading. Their cleaning made it possible to overcome this obstacle and verify the following.\
+
+-   The data demonstrate that the Italian wine industry is growing, both in the production of wine and the number of producers. Pareto's Principle application tells us that this occurs mainly in the northern regions of Italy.
+
+-   The inputs and outputs are correlated, but we cannot determine if there is some causality connection between them.
+
+-   Concerning the categorical variables, we tested the hypothesis of the influence of soil quality on production. Although the null hypothesis was accepted in the first test, the null hypothesis was rejected in the subsequent bootstrap test, concluding that soil quality influences the quantity of wine produced.
+
+-   Avenues for future research could investigate if climate and other disadvantages affect wine production, considering Italy's canonical division into three macro areas north, center and south.
+
+# REFERENCES
+
+Henderson, A. R. (2005). The bootstrap: a technique for data-driven statistics. Using computer-intensive analyses to explore experimental data. Clinica Chimica Acta; International Journal of Clinical Chemistry, 359(1--2), 1--26. <https://doi.org/10.1016/J.CCCN.2005.04.002>
+
+West, R. M. (2021). Best practice in statistics: The use of log transformation: [https://Doi.Org/10.1177/00045632211050531,](ttps://Doi.Org/10.1177/00045632211050531,) 0(0), 1--4. 
+
+Changyong, F. E. N. G., Hongyue, W. A. N. G., Naiji, L. U., Tian, C. H. E. N., Hua, H. E., & Ying, L. U. (2014). Log-transformation and its implications for data analysis. Shanghai archives of psychiatry, 26(2), 105.
+
+Hodge, V., & Austin, J. (2004). A survey of outlier detection methodologies. Artificial intelligence review, 22(2), 85-126.
+
+# R CODE USED IN THIS ANALYSIS
+
+-   Summary statistics and graphs: <https://drive.google.com/file/d/1oA_7y-iBzSQyPwg53yYv1hqIkaAecpWK/view?usp=sharing>
+
+-   Bootstrapping: <https://drive.google.com/file/d/1tldvcoUVQwgnUXoVcku4TEXn462EfLKi/view?usp=sharing>
+
+-   Map of Italy: <https://drive.google.com/file/d/1CTNYXPkMnihq7YwpZAvCQzlWzxt5xjx2/view?usp=sharing>
+
+-   R Markdown Report: <https://drive.google.com/file/d/1RKQYw2lyuTevYgFXJ0I4v_gJh5aJtz_S/view?usp=sharing>
+
+# THANK YOU FOR YOUR TIME
+
+![](images/paste-FAC56201.png){width="521"}
