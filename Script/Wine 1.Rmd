@@ -54,14 +54,13 @@ library(lwgeom)
 library(gganimate)
 library(gifski)
 library(ggpubr)
-
+library(here)
 ```
 
 ```{r setting directory, include=FALSE}
-directory <- setwd("~/Dropbox/Tesis/2021/Italy/Urbino/Lectures & Modules/Second Module/Applied Statistics/Presentation")
-wine_df <- read_excel("Italian_wine_producers_01.xlsx", sheet = 2, col_names = TRUE)
+wine_df <- read_excel(here("Data", "Italian_wine_producers_01.xlsx"), sheet = "Data")
 wine_df[, c(1:11, 14:17)] <- lapply(wine_df[,c(1:11, 14:17)], as.factor)
-str(wine_df)
+
 ```
 
 # CONTENT
